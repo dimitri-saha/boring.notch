@@ -189,8 +189,23 @@ class BoringViewModel: NSObject, ObservableObject {
         return false
     }
 
+    /// The open notch size for a tab. The terminal tab gets extra height so a shell is usable.
+    func expandedNotchSize(for view: NotchViews) -> CGSize {
+        if view == .terminal && Defaults[.enableTerminal] {
+            let height = min(max(Defaults[.terminalNotchHeight], minTerminalNotchHeight), maxTerminalNotchHeight)
+            return CGSize(width: openNotchSize.width, height: height)
+        }
+        return openNotchSize
+    }
+
+    /// Re-applies the open size after the current tab changed while the notch is open.
+    func refreshOpenNotchSize() {
+        guard notchState == .open else { return }
+        notchSize = expandedNotchSize(for: coordinator.currentView)
+    }
+
     func open() {
-        self.notchSize = openNotchSize
+        self.notchSize = expandedNotchSize(for: coordinator.currentView)
         self.notchState = .open
         
         // Force music information update when notch is opened

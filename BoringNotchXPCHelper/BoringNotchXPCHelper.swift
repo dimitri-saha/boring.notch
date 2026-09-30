@@ -11,6 +11,57 @@ import IOKit
 import CoreGraphics
 
 class BoringNotchXPCHelper: NSObject, BoringNotchXPCHelperProtocol {
+
+    // MARK: - Terminal
+
+    /// The shell session bound to this connection, if any. XPC delivers messages for one
+    /// connection serially, so this needs no extra locking.
+    private var terminalSession: TerminalSessionHost?
+
+    @objc func startTerminalSession(columns: Int, rows: Int, shellPath: String, with reply: @escaping (Bool, String) -> Void) {
+        guard let connection = NSXPCConnection.current() else {
+            reply(false, "The terminal request did not arrive over an XPC connection.")
+            return
+        }
+        guard let client = connection.remoteObjectProxyWithErrorHandler({ error in
+            NSLog("BoringNotchXPCHelper: terminal client proxy error: \(error.localizedDescription)")
+        }) as? BoringNotchTerminalClientProtocol else {
+            reply(false, "The app did not export a terminal client on this connection.")
+            return
+        }
+
+        stopTerminalSession()
+
+        let session = TerminalSessionHost(
+            onOutput: { data in client.terminalDidReceiveOutput(data) },
+            onExit: { status in client.terminalDidExit(status: status) }
+        )
+        do {
+            try session.start(columns: columns, rows: rows, shellPath: shellPath)
+            terminalSession = session
+            reply(true, "")
+        } catch {
+            reply(false, error.localizedDescription)
+        }
+    }
+
+    @objc func writeTerminalInput(_ data: Data) {
+        terminalSession?.write(data)
+    }
+
+    @objc func resizeTerminal(columns: Int, rows: Int) {
+        terminalSession?.resize(columns: columns, rows: rows)
+    }
+
+    @objc func stopTerminalSession() {
+        terminalSession?.stop()
+        terminalSession = nil
+    }
+
+    /// Called when the app side goes away so the shell does not outlive its notch.
+    func connectionDidInvalidate() {
+        stopTerminalSession()
+    }
     
     @objc func isAccessibilityAuthorized(with reply: @escaping (Bool) -> Void) {
         reply(AXIsProcessTrusted())

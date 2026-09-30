@@ -108,7 +108,11 @@ class BoringNotchSkyLightWindow: NSPanel {
     }
     
     private var observers: Set<AnyCancellable> = []
-    
-    override var canBecomeKey: Bool { false }
+
+    /// The notch normally refuses key status so it never steals keyboard focus. The terminal tab
+    /// flips this on while it needs typing, and off again when it goes away.
+    var allowsKeyboardFocus: Bool = false
+
+    override var canBecomeKey: Bool { allowsKeyboardFocus }
     override var canBecomeMain: Bool { false }
 }

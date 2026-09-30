@@ -160,6 +160,29 @@ struct ContentView: View {
                             }
                         }
                     }
+                    .onReceive(NotificationCenter.default.publisher(for: .notchTerminalFocusDidEnd)) { _ in
+                        // The user clicked away from the terminal; close the notch unless the pointer is still on it.
+                        guard vm.notchState == .open, coordinator.currentView == .terminal, !isHovering, !vm.isBatteryPopoverActive else { return }
+                        hoverTask?.cancel()
+                        hoverTask = Task {
+                            try? await Task.sleep(for: .milliseconds(150))
+                            guard !Task.isCancelled else { return }
+                            await MainActor.run {
+                                if self.vm.notchState == .open && !self.isHovering && !self.vm.isBatteryPopoverActive
+                                    && !TerminalSessionController.shared.shouldKeepNotchOpen && !SharingStateManager.shared.preventNotchClose {
+                                    self.vm.close()
+                                }
+                            }
+                        }
+                    }
+                    .onChange(of: coordinator.currentView) { _, _ in
+                        // The terminal tab uses a taller notch than the other tabs.
+                        if vm.notchState == .open {
+                            withAnimation(animationSpring) {
+                                vm.refreshOpenNotchSize()
+                            }
+                        }
+                    }
                     .onChange(of: vm.notchState) { _, newState in
                         if newState == .closed && isHovering {
                             withAnimation {
@@ -211,7 +234,12 @@ struct ContentView: View {
             anchor: .top
         )
         .animation(.smooth, value: gestureProgress)
-        .background(dragDetector)
+        .background(alignment: .top) {
+            // Keep the drop-detection area at the classic notch footprint; the window itself is
+            // taller now so the terminal tab can expand.
+            dragDetector
+                .frame(width: windowSize.width, height: openNotchSize.height + shadowPadding)
+        }
         .preferredColorScheme(.dark)
         .environmentObject(vm)
         .onChange(of: vm.anyDropZoneTargeting) { _, isTargeted in
@@ -349,6 +377,8 @@ struct ContentView: View {
                         NotchHomeView(albumArtNamespace: albumArtNamespace)
                     case .shelf:
                         ShelfView()
+                    case .terminal:
+                        NotchTerminalView()
                     }
                 }
                 .transition(
@@ -549,7 +579,8 @@ struct ContentView: View {
                         self.isHovering = false
                     }
                     
-                    if self.vm.notchState == .open && !self.vm.isBatteryPopoverActive && !SharingStateManager.shared.preventNotchClose {
+                    if self.vm.notchState == .open && !self.vm.isBatteryPopoverActive && !SharingStateManager.shared.preventNotchClose
+                        && !TerminalSessionController.shared.shouldKeepNotchOpen {
                         self.vm.close()
                     }
                 }
@@ -583,7 +614,8 @@ struct ContentView: View {
     }
 
     private func handleUpGesture(translation: CGFloat, phase: NSEvent.Phase) {
-        guard vm.notchState == .open && !vm.isHoveringCalendar else { return }
+        // Scrolling through terminal scrollback must not count as a swipe-to-close.
+        guard vm.notchState == .open && !vm.isHoveringCalendar && !TerminalSessionController.shared.isHostVisible else { return }
 
         withAnimation(animationSpring) {
             gestureProgress = (translation / Defaults[.gestureSensitivity]) * -20

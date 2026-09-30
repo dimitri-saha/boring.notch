@@ -171,6 +171,13 @@ extension Defaults.Keys {
     static let autoRemoveShelfItems = Key<Bool>("autoRemoveShelfItems", default: false)
     static let expandedDragDetection = Key<Bool>("expandedDragDetection", default: true)
     
+    // MARK: Terminal
+    static let enableTerminal = Key<Bool>("enableTerminal", default: true)
+    static let terminalFontSize = Key<CGFloat>("terminalFontSize", default: 12)
+    static let terminalNotchHeight = Key<CGFloat>("terminalNotchHeight", default: 320)
+    static let terminalShellPath = Key<String>("terminalShellPath", default: "")
+    static let terminalKeepNotchOpenWhileFocused = Key<Bool>("terminalKeepNotchOpenWhileFocused", default: true)
+
     // MARK: Calendar
     static let calendarSelectionState = Key<CalendarSelectionState>("calendarSelectionState", default: .all)
     static let hideAllDayEvents = Key<Bool>("hideAllDayEvents", default: false)

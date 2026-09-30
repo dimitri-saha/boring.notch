@@ -20,6 +20,22 @@ import Foundation
     func isScreenBrightnessAvailable(with reply: @escaping (Bool) -> Void)
     func currentScreenBrightness(with reply: @escaping (NSNumber?) -> Void)
     func setScreenBrightness(_ value: Float, with reply: @escaping (Bool) -> Void)
+
+    // MARK: - Terminal session (one shell per XPC connection)
+    /// Spawns a login shell on a pseudo-terminal. Output and the exit status are streamed back
+    /// through the `BoringNotchTerminalClientProtocol` object the app exports on the same connection.
+    /// Pass an empty `shellPath` to use the account's login shell.
+    func startTerminalSession(columns: Int, rows: Int, shellPath: String, with reply: @escaping (Bool, String) -> Void)
+    func writeTerminalInput(_ data: Data)
+    func resizeTerminal(columns: Int, rows: Int)
+    func stopTerminalSession()
+}
+
+/// Exported by the app on its terminal XPC connection so the helper can push
+/// pseudo-terminal output and the shell's exit status back to the notch.
+@objc protocol BoringNotchTerminalClientProtocol {
+    func terminalDidReceiveOutput(_ data: Data)
+    func terminalDidExit(status: Int32)
 }
 
 /*
