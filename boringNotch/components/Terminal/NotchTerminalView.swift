@@ -98,16 +98,24 @@ final class TerminalContainerView: NSView {
         attachedTerminal?.frame = bounds
     }
 
+    // SwiftUI adds and removes this view during its own update pass. Publishing state or
+    // moving keyboard focus from inside that pass is not allowed, so both callbacks are
+    // deferred to the next run-loop turn and re-validated when they run.
     override func viewDidMoveToWindow() {
         super.viewDidMoveToWindow()
-        if let window {
-            TerminalSessionController.shared.hostDidAppear(in: window)
+        guard let window else { return }
+        DispatchQueue.main.async { [weak self] in
+            guard let self, self.window === window else { return }
+            TerminalSessionController.shared.hostDidAppear(self, in: window)
         }
     }
 
     override func viewWillMove(toWindow newWindow: NSWindow?) {
         if newWindow == nil, window != nil {
-            TerminalSessionController.shared.hostWillDisappear()
+            DispatchQueue.main.async { [weak self] in
+                guard let self, self.window == nil else { return }
+                TerminalSessionController.shared.hostWillDisappear(self)
+            }
         }
         super.viewWillMove(toWindow: newWindow)
     }

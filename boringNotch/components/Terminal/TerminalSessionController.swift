@@ -66,6 +66,9 @@ final class TerminalSessionController: ObservableObject {
     private var proxy: BoringNotchXPCHelperProtocol?
 
     private weak var observedWindow: NSWindow?
+    /// The container view currently showing the terminal; appear/disappear callbacks are
+    /// delivered asynchronously, so this guards against them arriving out of order.
+    private weak var activeHost: NSView?
     private var windowObservers: [NSObjectProtocol] = []
     private var previousApplication: NSRunningApplication?
     private var didActivateApp = false
@@ -229,14 +232,17 @@ final class TerminalSessionController: ObservableObject {
     /// The notch panel never takes key status on its own, so it never steals focus from other apps.
     /// While the terminal is visible we activate Boring Notch, make the panel key, and hand
     /// activation back to the previous app when the terminal goes away.
-    func hostDidAppear(in window: NSWindow) {
+    func hostDidAppear(_ host: NSView, in window: NSWindow) {
+        activeHost = host
         isHostVisible = true
         observe(window)
         ensureSessionRunning()
         acquireKeyboardFocus()
     }
 
-    func hostWillDisappear() {
+    func hostWillDisappear(_ host: NSView) {
+        guard activeHost === host else { return }
+        activeHost = nil
         isHostVisible = false
         releaseKeyboardFocus()
         stopObserving()
